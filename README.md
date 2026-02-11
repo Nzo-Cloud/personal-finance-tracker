@@ -28,3 +28,7 @@ A C# console application for tracking income and expenses with categorized trans
 
 ## Author
 Balitian, Lorenzo
+
+## Git Workflow Notes
+This project uses incremental commits and standard Git practices.
+For collaboration, feature work can be done on branches and merged via pull requests.
