@@ -42,14 +42,16 @@ enum IncomeCategory
 // Represents a single financial transaction
 class Transaction
 {
+    public int Id { get; set; }
     public DateTime Date { get; set; }
     public decimal Amount { get; set; }
     public TransactionType Type { get; set; }
     public string Category { get; set; }
     public string Description { get; set; }
 
-    public Transaction(DateTime date, decimal amount, TransactionType type, string category, string description)
+    public Transaction(int id, DateTime date, decimal amount, TransactionType type, string category, string description)
     {
+        Id = id;
         Date = date;
         Amount = amount;
         Type = type;
@@ -60,7 +62,7 @@ class Transaction
     // Displays the transaction in a formatted console-friendly line
     public void Display()
     {
-        Console.WriteLine($"{Date:yyyy-MM-dd} | {Type} | {Category} | {Amount:C} | {Description}");
+        Console.WriteLine($"{Id,4} | {Date:yyyy-MM-dd} | {Type,-7} | {Category,-13} | {Amount,10:C} | {Description}");
     }
 }
 
@@ -72,6 +74,7 @@ class Transaction
 class FinanceManager
 {
     private List<Transaction> transactions;
+    private int nextId = 1;
 
     public FinanceManager()
     {
@@ -79,10 +82,50 @@ class FinanceManager
     }
 
     // Adds a new transaction to memory
-    public void AddTransaction(Transaction t)
+    public void AddTransaction(DateTime date, decimal amount, TransactionType type, string category, string description)
     {
+        var t = new Transaction(nextId++, date, amount, type, category, description);
         transactions.Add(t);
         Console.WriteLine("Transaction added successfully.");
+    }
+
+    // Deletes a transaction by ID
+    public bool DeleteTransaction(int id)
+    {
+        var t = transactions.FirstOrDefault(t => t.Id == id);
+        if (t == null)
+        {
+            Console.WriteLine($"Transaction with ID {id} not found.");
+            return false;
+        }
+
+        transactions.Remove(t);
+        Console.WriteLine("Transaction deleted successfully.");
+        return true;
+    }
+
+    // Gets a transaction by ID for editing
+    public Transaction? GetTransactionById(int id)
+    {
+        return transactions.FirstOrDefault(t => t.Id == id);
+    }
+
+    // Updates a transaction's fields
+    public void UpdateTransaction(int id, DateTime date, decimal amount, TransactionType type, string category, string description)
+    {
+        var t = transactions.FirstOrDefault(t => t.Id == id);
+        if (t == null)
+        {
+            Console.WriteLine($"Transaction with ID {id} not found.");
+            return;
+        }
+
+        t.Date = date;
+        t.Amount = amount;
+        t.Type = type;
+        t.Category = category;
+        t.Description = description;
+        Console.WriteLine("Transaction updated successfully.");
     }
 
     // Displays all stored transactions
@@ -94,8 +137,8 @@ class FinanceManager
             return;
         }
 
-        Console.WriteLine("Date       | Type    | Category      | Amount   | Description");
-        Console.WriteLine("--------------------------------------------------------------");
+        Console.WriteLine("  ID | Date       | Type    | Category      |     Amount | Description");
+        Console.WriteLine("--------------------------------------------------------------------------");
 
         foreach (var t in transactions)
         {
@@ -194,7 +237,7 @@ class FinanceManager
                     string description = parts[4];
 
                     transactions.Add(
-                        new Transaction(date, amount, type, category, description)
+                        new Transaction(nextId++, date, amount, type, category, description)
                     );
                 }
                 else
@@ -233,9 +276,11 @@ class Program
             Console.WriteLine("\n1. Add Transaction");
             Console.WriteLine("2. View All Transactions");
             Console.WriteLine("3. View Summary");
-            Console.WriteLine("4. Save Transactions to CSV");
-            Console.WriteLine("5. Load Transactions from CSV");
-            Console.WriteLine("6. Exit");
+            Console.WriteLine("4. Edit Transaction");
+            Console.WriteLine("5. Delete Transaction");
+            Console.WriteLine("6. Save Transactions to CSV");
+            Console.WriteLine("7. Load Transactions from CSV");
+            Console.WriteLine("8. Exit");
 
             string input = Console.ReadLine()!;
 
@@ -254,18 +299,26 @@ class Program
                     break;
 
                 case "4":
+                    EditTransactionFlow(manager);
+                    break;
+
+                case "5":
+                    DeleteTransactionFlow(manager);
+                    break;
+
+                case "6":
                     manager.SaveToCsv(
                         GetValidFileName("Enter file name to save (e.g., transactions.csv): ")
                     );
                     break;
 
-                case "5":
+                case "7":
                     manager.LoadFromCsv(
                         GetValidFileName("Enter file name to load (e.g., transactions.csv): ")
                     );
                     break;
 
-                case "6":
+                case "8":
                     running = false;
                     Console.WriteLine("Exiting...");
                     break;
@@ -391,9 +444,7 @@ class Program
                 Console.WriteLine("Description cannot be empty.");
             }
 
-            manager.AddTransaction(
-                new Transaction(date, amount, type, category, description)
-            );
+        manager.AddTransaction(date, amount, type, category, description);
 
             // Continue?
             while (true)
@@ -407,5 +458,108 @@ class Program
                 Console.WriteLine("Invalid input.");
             }
         }
+    }
+
+    // Handles deletion of a transaction by ID
+    static void DeleteTransactionFlow(FinanceManager manager)
+    {
+        manager.ListTransactions();
+
+        while (true)
+        {
+            Console.Write("\nEnter transaction ID to delete (or 0 to cancel): ");
+            if (int.TryParse(Console.ReadLine(), out int id))
+            {
+                if (id == 0)
+                {
+                    Console.WriteLine("Cancelled.");
+                    return;
+                }
+
+                if (manager.DeleteTransaction(id))
+                    return;
+            }
+            else
+            {
+                Console.WriteLine("Invalid ID.");
+            }
+        }
+    }
+
+    // Handles editing of a transaction by ID
+    static void EditTransactionFlow(FinanceManager manager)
+    {
+        manager.ListTransactions();
+
+        Console.Write("\nEnter transaction ID to edit (or 0 to cancel): ");
+        if (!int.TryParse(Console.ReadLine(), out int id) || id == 0)
+        {
+            Console.WriteLine("Cancelled.");
+            return;
+        }
+
+        var existing = manager.GetTransactionById(id);
+        if (existing == null)
+        {
+            Console.WriteLine($"Transaction with ID {id} not found.");
+            return;
+        }
+
+        Console.WriteLine($"\nEditing transaction {id}. Press Enter to keep current value.");
+
+        // Date
+        Console.Write($"Date ({existing.Date:yyyy-MM-dd}): ");
+        string dateInput = Console.ReadLine()!;
+        DateTime date = string.IsNullOrWhiteSpace(dateInput) ? existing.Date : DateTime.Parse(dateInput);
+
+        // Amount
+        Console.Write($"Amount ({existing.Amount}): ");
+        string amountInput = Console.ReadLine()!;
+        decimal amount = string.IsNullOrWhiteSpace(amountInput) ? existing.Amount : decimal.Parse(amountInput);
+
+        // Type
+        Console.Write($"Type ({existing.Type}) - 1. Income  2. Expense: ");
+        string typeInput = Console.ReadLine()!;
+        TransactionType type = existing.Type;
+        if (typeInput == "1") type = TransactionType.Income;
+        else if (typeInput == "2") type = TransactionType.Expense;
+
+        // Category
+        string category = existing.Category;
+        Console.Write($"Change category? Current: {existing.Category} (y/n): ");
+        if (Console.ReadLine()!.Trim().ToLower() == "y")
+        {
+            if (type == TransactionType.Expense)
+            {
+                Console.WriteLine("Select Expense category:");
+                foreach (var cat in Enum.GetValues(typeof(ExpenseCategory)))
+                    Console.WriteLine($"{(int)cat + 1}. {cat}");
+
+                if (int.TryParse(Console.ReadLine(), out int idx) &&
+                    idx >= 1 && idx <= Enum.GetValues(typeof(ExpenseCategory)).Length)
+                {
+                    category = ((ExpenseCategory)(idx - 1)).ToString();
+                }
+            }
+            else
+            {
+                Console.WriteLine("Select Income category:");
+                foreach (var cat in Enum.GetValues(typeof(IncomeCategory)))
+                    Console.WriteLine($"{(int)cat + 1}. {cat}");
+
+                if (int.TryParse(Console.ReadLine(), out int idx) &&
+                    idx >= 1 && idx <= Enum.GetValues(typeof(IncomeCategory)).Length)
+                {
+                    category = ((IncomeCategory)(idx - 1)).ToString();
+                }
+            }
+        }
+
+        // Description
+        Console.Write($"Description ({existing.Description}): ");
+        string descInput = Console.ReadLine()!;
+        string description = string.IsNullOrWhiteSpace(descInput) ? existing.Description : descInput;
+
+        manager.UpdateTransaction(id, date, amount, type, category, description);
     }
 }
